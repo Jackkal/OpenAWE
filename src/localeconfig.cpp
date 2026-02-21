@@ -21,6 +21,8 @@
 #include "src/common/xml.h"
 
 #include "src/localeconfig.h"
+#include "src/awe/resman.h"
+#include "src/common/exception.h"
 
 typedef std::tuple<unsigned int, unsigned int> Locale;
 
@@ -93,6 +95,13 @@ LocaleConfig::LocaleConfig(Common::ReadStream &locale) {
 
 		_entries[lang] = entry;
 	}
+}
+
+LocaleConfig::LocaleConfig(const std::string &path) {
+	std::unique_ptr<Common::ReadStream> localeConfigStream(ResMan.getResource(path));
+		if (!localeConfigStream)
+			throw Common::Exception("Locale Config file not found");
+		*this = LocaleConfig(*localeConfigStream);
 }
 
 const LocaleConfig::Config &LocaleConfig::getLanguageConfig(Common::Language l) const {

@@ -44,6 +44,7 @@ public:
 	};
 
 	LocaleConfig(Common::ReadStream &locale);
+	LocaleConfig(const std::string &path);
 
 	/*!
 	 * Get the entry data for a specific language. If the language is not available, this method returns the english

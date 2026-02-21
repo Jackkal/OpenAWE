@@ -243,23 +243,23 @@ void Game::init() {
 	spdlog::info("Loading font fixedsys");
 	FontMan.load("fonts/fixedsys.binfnt", "fixedsys");
 
-	// Initialize locale config
-	std::unique_ptr<Common::ReadStream> localeConfigStream(ResMan.getResource("config/locale_config.xml"));
-	if (!localeConfigStream)
-		throw Common::Exception("Locale Config file not found");
-	LocaleConfig localeConfig(*localeConfigStream);
+	std::unique_ptr<LocaleConfig> localeConfig;
 
 	switch (engine) {
 		case kAlanWake:
+			// Initialize locale config
+			localeConfig = std::make_unique<LocaleConfig>("config/locale_config.xml");
 			_engine = std::make_unique<Engines::AlanWake::Engine>(
 				_registry,
-				localeConfig.getLanguageConfig(_language)
+				localeConfig->getLanguageConfig(_language)
 			);
 			break;
 		case kAlanWakesAmericanNightmare:
+			// Initialize locale config
+			localeConfig = std::make_unique<LocaleConfig>("config/locale_config.xml");
 			_engine = std::make_unique<Engines::AlanWakesAmericanNightmare::Engine>(
 				_registry,
-				localeConfig.getLanguageConfig(_language)
+				localeConfig->getLanguageConfig(_language)
 			);
 			break;
 		case kQuantumBreak:
