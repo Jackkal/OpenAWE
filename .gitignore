@@ -16,3 +16,9 @@ cmake-build-*
 *.bingrs
 *.binhvk
 *.binhkt
+
+#build files
+build/
+
+#imgui ini file
+imgui.ini
