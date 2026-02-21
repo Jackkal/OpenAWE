@@ -52,6 +52,7 @@
 
 #include "src/engines/aw/engine.h"
 #include "src/engines/awan/engine.h"
+#include "src/engines/control/engine.h"
 
 #include "src/sound/soundman.h"
 
@@ -244,6 +245,7 @@ void Game::init() {
 	FontMan.load("fonts/fixedsys.binfnt", "fixedsys");
 
 	std::unique_ptr<LocaleConfig> localeConfig;
+	LocaleConfig::Config config;
 
 	switch (engine) {
 		case kAlanWake:
@@ -260,6 +262,18 @@ void Game::init() {
 			_engine = std::make_unique<Engines::AlanWakesAmericanNightmare::Engine>(
 				_registry,
 				localeConfig->getLanguageConfig(_language)
+			);
+			break;
+		case kControl:
+			// Control does not use locale_config.xml. Using a fixed locale config.
+			config.folder = "en";
+			config.voiceoverChannel = 2;
+			config.subtitlesDefault = false;
+			config.useOnlyOneFont = true;
+
+			_engine = std::make_unique<Engines::Control::Engine>(
+				_registry,
+				config
 			);
 			break;
 		case kQuantumBreak:
