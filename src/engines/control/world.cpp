@@ -23,11 +23,12 @@
 #include <memory>
 
 #include <spdlog/spdlog.h>
+#include <fmt/format.h>
 
 #include <src/graphics/gfxman.h>
 #include <src/awe/terraindatafile.h>
 
-#include "world.h"
+#include "src/engines/control/world.h"
 #include "src/awe/resman.h"
 #include "src/awe/binarchive.h"
 #include "src/awe/cidfile.h"
@@ -35,11 +36,13 @@
 #include "src/awe/havokfile.h"
 #include "src/awe/script/collection.h"
 
+namespace Engines::Control {
+
 World::World(entt::registry &registry, entt::scheduler<double> &scheduler, const std::string &name) :
 	ObjectCollection(registry, scheduler),
 	_name(name)
 {
-	std::string filename = std::format("globaldb/{}.xml", _name);
+	std::string filename = fmt::format("globaldb/{}.xml", _name);
 
 	std::unique_ptr<Common::ReadStream> worldStream(ResMan.getResource(filename));
 	//if (!worldStream)
@@ -58,14 +61,14 @@ const std::string &World::getName() const {
 
 void World::loadGlobal() {
 	spdlog::info("Loading global data from {}", _name);
-	std::string globalFolder = std::format("worlds/{}/episodes/global", _name);
+	std::string globalFolder = fmt::format("worlds/{}/episodes/global", _name);
 
 	if (!ResMan.hasDirectory(globalFolder)) {
 		spdlog::debug("Cannot find global data for {}", _name);
 		return;
 	}
 
-	loadGIDRegistry(ResMan.getResource(std::format("{}/GIDRegistry.txt", globalFolder)));
+	loadGIDRegistry(ResMan.getResource(fmt::format("{}/GIDRegistry.txt", globalFolder)));
 
 	std::string globalArchive;
 	if (ResMan.hasResource(globalFolder + "/tasks.bin"))
@@ -110,4 +113,6 @@ void World::setVisible(bool visible) {
 	_currentEpisode->setVisible(visible);
 
 	ObjectCollection::setVisible(visible);
+}
+
 }

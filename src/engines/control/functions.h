@@ -72,4 +72,4 @@ private:
 
 }
 
-#endif //OPENAWE_FUNCTIONS_H
+#endif //OPENAWE_CONTROL_FUNCTIONS_H

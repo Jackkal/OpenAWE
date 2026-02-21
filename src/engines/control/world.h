@@ -18,34 +18,40 @@
  * along with OpenAWE. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENAWE_CONTROL_ENGINE_H
-#define OPENAWE_CONTROL_ENGINE_H
+#ifndef AWE_WORLD_H
+#define AWE_WORLD_H
 
-#include "src/engine.h"
-#include "src/engines/control/world.h"
+#include <memory>
+
+#include <glm/glm.hpp>
+#include <src/awe/script/collection.h>
+
+#include "src/graphics/model.h"
+#include "src/awe/worldfile.h"
+#include "src/objectcollection.h"
+#include "src/global.h"
+#include "src/level.h"
+#include "src/episode.h"
 
 namespace Engines::Control {
 
-class Engine : public ::Engine {
+class World : public ObjectCollection {
 public:
-	Engine(entt::registry &registry, const LocaleConfig::Config &config);
+	World(entt::registry &registry, entt::scheduler<double> &scheduler, const std::string &name);
 
-	void init() override;
+	const std::string &getName() const;
 
-	const char *getName() const override;
+	void loadGlobal();
+	void loadEpisode(const std::string &id);
 
-	void loadEpisode(const std::string &data) override;
-
-protected:
-	void initEpisode() override;
+	void setVisible(bool visible) override;
 
 private:
-	std::unique_ptr<World> _world;
-	bool _doneLoading{true};
-	bool _started{true};
-
+	const std::string _name;
+	std::unique_ptr<WorldFile> _world;
+	std::unique_ptr<Episode> _currentEpisode;
 };
 
 }
 
-#endif //OPENAWE_ENGINE_H
+#endif //AWE_WORLD_H

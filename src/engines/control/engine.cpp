@@ -38,7 +38,7 @@ Engine::Engine(entt::registry &registry, const LocaleConfig::Config &config) :
 }
 
 void Engine::init() {
-	loadEpisode("worlds/worlds:hub");
+	loadEpisode("gameworld:hub");
 }
 
 void Engine::initEpisode() {
@@ -62,6 +62,27 @@ void Engine::initEpisode() {
 		AWE::Script::Context context(_registry, *_functions);
 		bytecode->run(context, "OnTaskActivate", item);
 	}
+}
+
+void Engine::loadEpisode(const std::string &data) {
+	_doneLoading = false;
+	Threads.add([this, data](){
+		std::vector<std::string> parameters = Common::split(data, std::regex(" "));
+		std::vector<std::string> episode = Common::split(parameters.back(), std::regex(":"));
+
+		std::string worldName = episode[0];
+		std::string episodeName = episode[1];
+
+		if (!_world || _world->getName() != worldName) {
+			_world = std::make_unique<World>(_registry, _scheduler, worldName);
+			_world->loadGlobal();
+		}
+
+		_world->loadEpisode(episodeName);
+
+		_doneLoading = true;
+		_started = false;
+	});
 }
 
 const char *Engine::getName() const {
