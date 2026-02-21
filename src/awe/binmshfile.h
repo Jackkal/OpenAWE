@@ -72,7 +72,8 @@ public:
 		glm::vec2,
 		glm::vec3,
 		glm::vec4,
-		std::string
+		std::string,
+		bool
 	> UniformData;
 
 	struct Uniform {
@@ -129,6 +130,7 @@ private:
 	Common::BoundBox _boundBox;
 
 	std::vector<byte> _vertexData;
+	std::vector<byte> _positionOnlyVertexData;
 	std::vector<byte> _indexData;
 
 	std::vector<Mesh> _meshs;

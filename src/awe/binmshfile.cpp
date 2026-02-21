@@ -38,19 +38,34 @@ BINMSHFile::BINMSHFile() {
 void BINMSHFile::load(Common::ReadStream &binmsh) {
 	const uint32_t version = binmsh.readUint32LE();
 
-	if (version != 21 && version != 20 && version != 19)
+	/*
+	   version 19   : Alan Wake
+	   version 20|21: Alan Wake AN
+	   version 43   : Quantum Break (not yet supported)
+	   version 46   : Control
+	*/
+	if (version != 46 && version != 21 && version != 20 && version != 19)
 		throw std::runtime_error(std::format("Unsupported version {}", version));
 
 	const uint32_t vertexBufferSize = binmsh.readUint32LE();
+	uint32_t positionOnlyVertexBufferSize = 0;
+	if (version >= 35)
+		positionOnlyVertexBufferSize = binmsh.readUint32LE();
 	const uint32_t indicesCount     = binmsh.readUint32LE();
 	const uint32_t indicesType      = binmsh.readUint32LE();
 
 	assert(indicesType == 2);
 
-	const uint32_t flags = binmsh.readUint32LE();
+	if (version <= 26)
+		const uint32_t flags = binmsh.readUint32LE();
 
 	_vertexData.resize(vertexBufferSize);
 	binmsh.read(_vertexData.data(), _vertexData.size());
+
+	if (version >= 35) {
+		_positionOnlyVertexData.resize(positionOnlyVertexBufferSize);
+		binmsh.read(_positionOnlyVertexData.data(), _positionOnlyVertexData.size());
+	}
 
 	_indexData.resize(indicesCount * indicesType);
 	binmsh.read(_indexData.data(), _indexData.size());
@@ -86,10 +101,26 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 		boneBoundSphere.position.z = binmsh.readIEEEFloatLE();
 		boneBoundSphere.radius = binmsh.readIEEEFloatLE();
 
+		if (version >= 43)
+			const uint32_t boneParent = binmsh.readSint32LE();
+
 		_inverseRestTransforms[boneName] = boneTransform;
 	}
 
 	const bool animated = boneCount > 0;
+
+	if (version >= 44) {
+		binmsh.skip(binmsh.readUint32LE()); // Unknown integer array
+	}
+
+	if (version >= 29) {
+		binmsh.skip(binmsh.readUint32LE()); // Unknown float array
+		binmsh.skip(4);                     // Float (equal to 1.0)
+		binmsh.skip(binmsh.readUint32LE()); // Unknown float array
+	}
+
+	if (version >= 42)
+		binmsh.skip(4); // Unknown float
 
 	_boundSphere.position.x = binmsh.readIEEEFloatLE();
 	_boundSphere.position.y = binmsh.readIEEEFloatLE();
@@ -114,14 +145,26 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 	const uint32_t materialCount = binmsh.readUint32LE();
 	std::vector<Material> materials(materialCount);
 	for (auto &material : materials) {
+		uint32_t materialVersion = 0;
+		if (version >= 43) {
+			materialVersion = binmsh.readUint32LE();  /* materialVersion: Quantum Break: 4, Control: 7 */
+			if (materialVersion >= 6)
+				const uint64_t GlobalID = binmsh.readUint64LE();
+		}
+
 		if (version >= 20) {
 			const uint32_t nameLength = binmsh.readUint32LE();
-			material.name = binmsh.readFixedSizeString(nameLength);
+			material.name = binmsh.readFixedSizeString(nameLength, materialVersion > 1 ? false : true);
 		}
 
 		const uint32_t shaderNameLength = binmsh.readUint32LE();
-		const std::string shaderName = Common::toLower(binmsh.readFixedSizeString(shaderNameLength, true));
+		const std::string shaderName = Common::toLower(binmsh.readFixedSizeString(shaderNameLength, materialVersion > 1 ? false : true));
 		material.shader = std::regex_replace(shaderName, std::regex("\\.rfx"), "");
+
+		if (version >= 43) {
+			const uint32_t sourceFilePathLength = binmsh.readUint32LE();
+			const std::string sourceFilePath = binmsh.readFixedSizeString(sourceFilePathLength);
+		}
 
 		material.properties = binmsh.readUint32LE() | globalProperties;
 		material.blendMode  = BlendMode(binmsh.readUint32LE());
@@ -133,6 +176,12 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 		const bool refractive = f[1];
 		const bool specular = f[2];
 
+		if (materialVersion >= 3)
+			const uint32_t BRDF = binmsh.readUint32LE();
+
+		if (materialVersion >= 6)
+			binmsh.skip(4); // Unknown
+
 		const uint32_t numUniforms = binmsh.readUint32LE();
 		material.uniforms.resize(numUniforms);
 		for (auto &uniform : material.uniforms) {
@@ -141,28 +190,58 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 
 			const uint32_t dataType = binmsh.readUint32LE();
 			switch (dataType) {
-				case 0:
+				case 0: // float
 					uniform.data = binmsh.readIEEEFloatLE();
 					break;
-				case 1:
+				case 1: // vec2
 					uniform.data = binmsh.read<glm::vec2>();
 					break;
-				case 2:
+				case 2: // vec3
 					uniform.data = binmsh.read<glm::vec3>();
 					break;
-				case 3:
+				case 3: // vec4
 					uniform.data = binmsh.read<glm::vec4>();
 					break;
-				case 7: {
+				case 7: { // string
 					uint32_t length = binmsh.readUint32LE();
 					uniform.data = AWE::getNormalizedPath(binmsh.readFixedSizeString(length, true));
 					break;
 				}
-
+				case 12: // boolean
+					uniform.data = binmsh.readUint32LE() == 1;
+					break;
 				default:
 					throw CreateException("Invalid or unknown uniform data type {}", dataType);
 			}
 		}
+	}
+
+	std::vector<uint32_t> materialMappingTable;
+	std::vector<std::pair<std::string, std::vector<uint32_t>>> materialSets;
+	std::vector<uint32_t> secondaryMaterialMappingTable; // Purpose unknown
+	if (version >= 43) {
+		const uint32_t materialMappingTableSize = binmsh.readUint32LE();
+		materialMappingTable.resize(materialMappingTableSize);
+		for (auto &materialIndex : materialMappingTable)
+			materialIndex = binmsh.readUint32LE();
+
+		// materialSets are named variants of the material mapping table
+		const uint32_t materialSetCount = binmsh.readUint32LE();
+		materialSets.resize(materialSetCount);
+		for (auto &materialSet : materialSets) {
+			const uint32_t materialSetNameLength = binmsh.readUint32LE();
+			materialSet.first = binmsh.readFixedSizeString(materialSetNameLength, true);
+
+			std::vector<uint32_t> materialMappingTable(materialMappingTableSize);
+			for (auto &materialIndex : materialMappingTable)
+				materialIndex = binmsh.readUint32LE();
+			materialSet.second = materialMappingTable;
+		}
+
+		const uint32_t secondaryMaterialMappingTableSize = binmsh.readUint32LE();
+		secondaryMaterialMappingTable.resize(secondaryMaterialMappingTableSize);
+		for (auto &materialIndex : secondaryMaterialMappingTable)
+			materialIndex = binmsh.readUint32LE();
 	}
 
 	const uint32_t meshCount = binmsh.readUint32LE();
@@ -173,20 +252,31 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 		mesh.vertexCount   = binmsh.readUint32LE();
 		mesh.indicesCount  = binmsh.readUint32LE() * 3; // Number of faces
 		mesh.vertexOffset  = binmsh.readUint32LE();
+
+		if (version >= 39)
+			const uint32_t positionOnlyVertexOffset = binmsh.readUint32LE();
+
 		mesh.indicesOffset = binmsh.readUint32LE() * indicesType;
 		binmsh.skip(4); // Unknown
 
 		if (version >= 21)
-			binmsh.skip(16);
+			binmsh.skip(16); //BoundSphere
+
+		if (version >= 23)
+			binmsh.skip(24); //BoundBox
 
 		assert(mesh.lod < lodCount);
 
+		if (version >= 43)
+			const uint32_t vertexAttributeVersion = binmsh.readUint32LE(); // Always 1
 		uint8_t vertexAttributeCount = binmsh.readByte();
 		mesh.attributes.resize(vertexAttributeCount);
 		for (auto &attribute: mesh.attributes) {
 			binmsh.skip(1);
 			const uint8_t usage = binmsh.readByte();
 			const uint8_t type = binmsh.readByte();
+			if (version >= 43)
+				binmsh.skip(1); // Always 0
 
 			switch (usage) {
 				case 0x02:
@@ -240,9 +330,21 @@ void BINMSHFile::load(Common::ReadStream &binmsh) {
 		mesh.material = materials[i];
 
 		const uint32_t boneMapCount = binmsh.readUint32LE();
-		mesh.boneMap.resize(boneMapCount);
-		for (auto &boneName: mesh.boneMap)
-			boneName = boneNames[binmsh.readByte()];
+
+		if (version < 34) {
+			mesh.boneMap.resize(boneMapCount);
+			for (auto &boneName: mesh.boneMap)
+				boneName = boneNames[binmsh.readByte()];
+		}
+
+		if (version >= 36)
+			const float UVDensity = binmsh.readIEEEFloatLE();
+
+		if (version >= 38)
+			binmsh.skip(1); // Unknown Boolean
+
+		if (version >= 40)
+			const float TesselationFactor = binmsh.readIEEEFloatLE();
 
 		i++;
 	}
