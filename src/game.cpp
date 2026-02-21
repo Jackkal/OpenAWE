@@ -185,7 +185,7 @@ void Game::init() {
 	}
 
 	// Check if the resources have packmeta files and load them and if not load streamed resources
-	if (engine == kAlanWakesAmericanNightmare) {
+	if (engine == kAlanWakesAmericanNightmare || engine == kControl) {
 		for (const auto &identifier : identifiers) {
 			spdlog::info("Indexing packmeta file {}", identifier + ".packmeta");
 			ResMan.indexPackmeta(identifier + ".packmeta");
