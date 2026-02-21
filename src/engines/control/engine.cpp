@@ -38,7 +38,7 @@ Engine::Engine(entt::registry &registry, const LocaleConfig::Config &config) :
 }
 
 void Engine::init() {
-	loadEpisode("gameworld:hub");
+	loadEpisode("worlds/worlds:hub");
 }
 
 void Engine::initEpisode() {
