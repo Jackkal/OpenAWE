@@ -50,6 +50,9 @@ private:
 	std::vector<Program> _programs;
 
 	std::unique_ptr<Common::ReadStream> _obj;
+
+	void OBJFileV10(Common::ReadStream *obj);
+	void OBJFileV29(Common::ReadStream *obj);
 };
 
 } // End of namspace AWE
