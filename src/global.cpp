@@ -35,10 +35,13 @@ Global::Global(entt::registry &registry, entt::scheduler<double> &scheduler) : O
 	spdlog::info("Loading global data");
 
 	loadGIDRegistry(ResMan.getResource("global/GIDRegistry.txt"));
-	loadBytecode(
-			ResMan.getResource("global/dp_bytecode.bin"),
-			ResMan.getResource("global/dp_bytecodeparameters.bin")
-	);
+
+	if (ResMan.hasResource("global/dp_bytecode.bin") && ResMan.hasResource("global/dp_bytecodeparameters.bin")) {
+		loadBytecode(
+				ResMan.getResource("global/dp_bytecode.bin"),
+				ResMan.getResource("global/dp_bytecodeparameters.bin")
+		);
+	}
 
 	auto dp = std::make_shared<DPFile>(ResMan.getResource("global/dp_global.bin"));
 
