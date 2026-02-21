@@ -38,7 +38,7 @@ enum GameEngine {
 
 struct GID {
 	uint32_t type;
-	uint32_t id;
+	uint64_t id;
 
 	[[nodiscard]] bool isNil() const {
 		return type == 0 && id == 0;
