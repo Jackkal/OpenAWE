@@ -178,7 +178,9 @@ void Game::init() {
 		case kResultAlanWakeRemastered:
 			throw CreateException("Alan Wake Remastered is not yet supported by OpenAWE.");
 		case kResultControl:
-			throw CreateException("Control is not yet supported by OpenAWE.");
+			spdlog::info("Initializing Control...");
+			engine = kControl;
+			break;
 		case kResultUnknown:
 		default:
 			throw CreateException("Unknown game data was supplied.");
