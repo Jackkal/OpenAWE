@@ -357,8 +357,6 @@ void Game::start() {
 	//Graphics::SkyPtr sky = std::make_shared<Graphics::Sky>();
 	//GfxMan.setSky(sky);
 
-	const auto skyEntity = _registry.create();
-	_registry.emplace<Graphics::SkyPtr>(skyEntity, sky);
 	double lastTime = _platform.getTime();
 
 	unsigned int frames = 0;
