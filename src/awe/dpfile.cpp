@@ -28,6 +28,14 @@ DPFile::DPFile(Common::ReadStream *dp) : _dp(dp) {
 	testHeader();
 
 	switch (_headerType) {
+		case kHeaderV3:
+			numValues = _dp->readUint32LE() + _dp->readUint32LE();
+			numStrings = _dp->readUint32LE();
+			_dataSize = _dp->readUint32LE();
+
+			_dp->skip(24); // Always 0 (placeholder for pointers during dp file loading)
+			break;
+
 		case kHeaderV2:
 			numValues = _dp->readUint32LE() + _dp->readUint32LE();
 			numStrings = _dp->readUint32LE();
@@ -53,21 +61,24 @@ DPFile::DPFile(Common::ReadStream *dp) : _dp(dp) {
 		offset = _dp->readUint32LE();
 	}
 
-	_stringOffsets.resize(numStrings);
-	for (auto &offset : _stringOffsets) {
-		offset = _dp->readUint32LE();
-	}
+	if (_headerType == kHeaderV1 || _headerType == kHeaderV2) {
 
-	for (const auto &item : _stringOffsets) {
-		bool overlap = (item & 0x80u) != 0;
+		_stringOffsets.resize(numStrings);
+		for (auto &offset : _stringOffsets) {
+			offset = _dp->readUint32LE();
+		}
 
-		int32_t offset = item >> 8u;
+		for (const auto &item : _stringOffsets) {
+			bool overlap = (item & 0x80u) != 0;
 
-		_dp->seek(-static_cast<int>(_dataSize) + offset * 8, Common::ReadStream::END);
-		if (overlap)
-			_dp->skip(4);
+			int32_t offset = item >> 8u;
 
-		std::string s = _dp->readNullTerminatedString();
+			_dp->seek(-static_cast<int>(_dataSize) + offset * 8, Common::ReadStream::END);
+			if (overlap)
+				_dp->skip(4);
+
+			std::string s = _dp->readNullTerminatedString();
+		}
 	}
 }
 
@@ -279,6 +290,19 @@ void DPFile::testHeader() {
 
 	if (28 + numValues * 4 + numReferences * 4 + numStrings * 4 + dataSize == fileSize) {
 		_headerType = kHeaderV2;
+		return;
+	}
+
+	// Test if it is a V3 header (Control)
+	numValues = _dp->readUint32LE();
+	numReferences = _dp->readUint32LE();
+	numStrings = _dp->readUint32LE();
+	dataSize = _dp->readUint32LE();
+
+	_dp->seek(0);
+
+	if (40 + numValues * 4 + numReferences * 4 + numStrings * 8 + dataSize == fileSize) {
+		_headerType = kHeaderV3;
 		return;
 	}
 
