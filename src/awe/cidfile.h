@@ -67,10 +67,11 @@ private:
 	enum FileFormat {
 		kSimple,
 		kStructured,
-		kStructuredV2
+		kStructuredV2,
+		kStructuredV3 // Used by Control
 	};
 
-	void testFormat(Common::ReadStream &cid);
+	void testFormat(Common::ReadStream &cid, uint32_t numElements);
 
 	unsigned int _version;
 

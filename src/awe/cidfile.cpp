@@ -39,7 +39,7 @@ CIDFile::CIDFile(Common::ReadStream &cid, ObjectType type, std::shared_ptr<DPFil
 
 	cid.skip(4); // Always Zero? Or 64bit num elements?
 
-	testFormat(cid);
+	testFormat(cid, numElements);
 
 	switch (_format) {
 		case kSimple: _objectStream = std::make_unique<AWE::ObjectBinaryReadStreamV1>(cid, dp); break;
@@ -47,6 +47,7 @@ CIDFile::CIDFile(Common::ReadStream &cid, ObjectType type, std::shared_ptr<DPFil
 		case kStructuredV2:
 			throw CreateException("Structured CID files in version 2, as used by Quantum Break and succeeding games "
 								  "are currently not supported");
+		case kStructuredV3: _objectStream = std::make_unique<AWE::ObjectBinaryReadStreamV2>(cid, dp); break;
 	}
 
 	_containers.resize(numElements);
@@ -63,8 +64,31 @@ const std::vector<Object> &CIDFile::getContainers() const {
 	return _containers;
 }
 
-void CIDFile::testFormat(Common::ReadStream &cid) {
-	// Simple test for determining the format of the file
+void CIDFile::testFormat(Common::ReadStream &cid, uint32_t numElements) {
+	// Save the current position to potentially rewind
+	size_t startPos = cid.pos();
+
+	// Check for GlobalID list (Control format - kStructuredV3)
+	// GlobalIDs are 8 bytes each, followed by kDeadBeefV2
+	if (numElements > 0) {
+		// Try to read GlobalIDs (8 bytes each)
+		size_t globalIDsPos = startPos;
+		cid.seek(globalIDsPos);
+
+		// Skip ahead to where kDeadBeefV2 would be if GlobalIDs are present
+		size_t potentialDeadBeefPos = globalIDsPos + (numElements * 8);
+		if (potentialDeadBeefPos < cid.size()) {
+			cid.seek(potentialDeadBeefPos);
+			const uint32_t deadbeefTest = cid.readUint32LE();
+			if (deadbeefTest == kDeadBeefV2) {
+				_format = kStructuredV3;
+				return; // Found kStructuredV3, we're done
+			}
+		}
+	}
+
+	// Not kStructuredV3, check for other formats
+	cid.seek(startPos);
 	const uint32_t deadbeefTest = cid.readUint32LE();
 	switch (deadbeefTest) {
 		case kDeadBeef:
